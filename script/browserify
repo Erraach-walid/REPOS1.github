@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+script/build
+pushd out/app
+browserify -e static/index.js --exclude electron --exclude buffer-offset-index --exclude ../script/deprecated-packages.json --exclude ../build/Release/pathwatcher.node --exclude ../build/Release/keyboard-layout-manager.node --exclude ../build/Release/git.node --exclude ../build/Release/scrollbar-style-observer.node --exclude ../build/Release/runas.node --exclude ../../build/Release/marker_index --exclude ../build/Release/onig_scanner.node --node --full-paths -o ../../static/bundle.js
+popd
