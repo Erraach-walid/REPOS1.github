@@ -1,0 +1,81 @@
+image: Visual Studio 2015
+
+version: "{build}"
+
+skip_tags: true
+clone_folder: c:\projects\atom
+clone_depth: 10
+
+branches:
+  only:
+  - master
+  - /^[0-9.]+-releases$/
+
+platform:
+  - x64
+  - x86
+
+environment:
+  global:
+    ATOM_DEV_RESOURCE_PATH: c:\projects\atom
+    TEST_JUNIT_XML_ROOT: c:\projects\junit-test-results
+    NODE_VERSION: 6.9.4
+
+  matrix:
+  - TASK: test
+  - TASK: installer
+
+matrix:
+  fast_finish: true
+
+install:
+  - SET PATH=C:\Program Files\Atom\resources\cli;%PATH%
+  - ps: Install-Product node $env:NODE_VERSION $env:PLATFORM
+  - npm install -g npm@5.1
+
+build_script:
+  - IF NOT EXIST C:\sqtemp MKDIR C:\sqtemp
+  - SET SQUIRREL_TEMP=C:\sqtemp
+  - CD %APPVEYOR_BUILD_FOLDER%
+  - IF NOT EXIST C:\tmp MKDIR C:\tmp
+  - SET SQUIRREL_TEMP=C:\tmp
+  - IF [%TASK%]==[installer] (
+      IF [%APPVEYOR_REPO_BRANCH:~-9%]==[-releases] (
+        script\build.cmd --code-sign --compress-artifacts --create-windows-installer
+      ) ELSE (
+        ECHO Skipping installer and Atom build on non-release branch
+      )
+    ) ELSE (
+      ECHO Skipping installer build on non-installer build matrix row &&
+      script\build.cmd --code-sign --compress-artifacts
+    )
+
+test_script:
+  - IF [%TASK%]==[test] (
+      script\lint.cmd &&
+      script\test.cmd
+    ) ELSE (
+      ECHO Skipping tests on installer build matrix row
+    )
+
+deploy: off
+artifacts:
+  - path: out\AtomSetup.exe
+    name: AtomSetup.exe
+  - path: out\atom-windows.zip
+    name: atom-windows.zip
+  - path: out\RELEASES
+    name: RELEASES
+  - path: out\atom-*-delta.nupkg
+    name: atom-delta.nupkg
+  - path: out\atom-*-full.nupkg
+    name: atom-full.nupkg
+
+cache:
+  - '%APPVEYOR_BUILD_FOLDER%\script\node_modules'
+  - '%APPVEYOR_BUILD_FOLDER%\apm\node_modules'
+  - '%APPVEYOR_BUILD_FOLDER%\node_modules'
+  - '%APPVEYOR_BUILD_FOLDER%\electron'
+  - '%USERPROFILE%\.atom\.apm'
+  - '%USERPROFILE%\.atom\compile-cache'
+  - '%USERPROFILE%\.atom\snapshot-cache'
