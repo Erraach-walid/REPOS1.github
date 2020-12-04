@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+
+'use strict'
+
+// Run bootstrap first to ensure all the dependencies used later in this script
+// are installed.
+require('./bootstrap')
+
+// Needed so we can require src/module-cache.coffee during generateModuleCache
+require('coffee-script/register')
+require('colors')
+
+const path = require('path')
+const yargs = require('yargs')
+const argv = yargs
+  .usage('Usage: $0 [options]')
+  .help('help')
+  .describe('existing-binaries', 'Use existing Atom binaries (skip clean/transpile/cache)')
+  .describe('code-sign', 'Code-sign executables (macOS and Windows only)')
+  .describe('create-windows-installer', 'Create installer (Windows only)')
+  .describe('create-debian-package', 'Create .deb package (Linux only)')
+  .describe('create-rpm-package', 'Create .rpm package (Linux only)')
+  .describe('compress-artifacts', 'Compress Atom binaries (and symbols on macOS)')
+  .describe('generate-api-docs', 'Only build the API documentation')
+  .describe('install', 'Install Atom')
+  .string('install')
+  .describe('ci', 'Install dependencies quickly (package-lock.json files must be up to date)')
+  .wrap(yargs.terminalWidth())
+  .argv
+
+const checkChromedriverVersion = require('./lib/check-chromedriver-version')
+const cleanOutputDirectory = require('./lib/clean-output-directory')
+const codeSign = require('./lib/code-sign')
+const compressArtifacts = require('./lib/compress-artifacts')
+const copyAssets = require('./lib/copy-assets')
+const dumpSymbols = require('./lib/dump-symbols')
+const generateAPIDocs = require('./lib/generate-api-docs')
+const generateMetadata = require('./lib/generate-metadata')
+const generateModuleCache = require('./lib/generate-module-cache')
+const generateStartupSnapshot = require('./lib/generate-startup-snapshot')
+const installApplication = require('./lib/install-application')
+const packageApplication = require('./lib/package-application')
+const prebuildLessCache = require('./lib/prebuild-less-cache')
+
+process.on('unhandledRejection', function (e) {
+  console.error(e.stack || e)
+  process.exit(1)
+})
+
+const CONFIG = require('./config')
+
+;(async function() {
+  if (!argv.existingBinaries) {
+    checkChromedriverVersion()
+    await cleanOutputDirectory()
+    await copyAssets()
+    generateModuleCache()
+    prebuildLessCache()
+    generateMetadata()
+    generateAPIDocs()
+    await dumpSymbols()
+  }
+
+  const packagedAppPath = await packageApplication()
+  await generateStartupSnapshot(packagedAppPath)
+  await codeSign(packagedAppPath, argv)
+
+  if (argv.compressArtifacts) {
+    compressArtifacts(packagedAppPath)
+  } else {
+    console.log('Skipping artifacts compression. Specify the --compress-artifacts option to compress Atom binaries (and symbols on macOS)'.gray)
+  }
+
+  if (argv.install != null) {
+    installApplication(packagedAppPath, argv.install)
+  } else {
+    console.log('Skipping installation. Specify the --install option to install Atom'.gray)
+  }
+})().then(
+  () => process.exit(0),
+  err => {
+    console.error(err.stack)
+    process.exit(1)
+  }
+)
