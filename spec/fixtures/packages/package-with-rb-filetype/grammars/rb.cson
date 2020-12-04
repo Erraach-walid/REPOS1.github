@@ -1,0 +1,12 @@
+'name': 'Test Ruby'
+'scopeName': 'test.rb'
+'firstLineMatch': '^\\#!.*(?:\\s|\\/)(?:testruby)(?:$|\\s)'
+'fileTypes': [
+  'rb'
+]
+'patterns': [
+  {
+    'match': 'ruby'
+    'name': 'meta.class.ruby'
+  }
+]
